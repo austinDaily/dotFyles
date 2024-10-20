@@ -40,6 +40,8 @@ func createDotfyles(cmd *cobra.Command, args []string) {
 	initializeRepo(dotFylesDir)
 	// find and copy/symlink the config files
 	findConfigs(dotFylesDir)
+	// stage and commit newly added config files
+	addAndCommit(dotFylesDir)
 }
 
 func initializeRepo(newPath string) {
