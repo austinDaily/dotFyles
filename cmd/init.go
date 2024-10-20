@@ -5,8 +5,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/spf13/cobra"
 )
 
@@ -170,4 +172,42 @@ func symLinkDirectory(src, dst string) error {
 	}
 	fmt.Println("Created symlink from:", src, "to", dst)
 	return nil
+}
+
+func addAndCommit(repoDir string) {
+	// open the git repo in the dotFyles directory
+	repo, err := git.PlainOpen(repoDir)
+	if err != nil {
+		fmt.Println("Error opening git repo:", err)
+		return
+	}
+	// get the working directory for the repo
+	worktree, err := repo.Worktree()
+	if err != nil {
+		fmt.Println("Error retrieving worktree:", err)
+		return
+	}
+	// git add
+	err = worktree.AddGlob(".")
+	if err != nil {
+		fmt.Println("Error adding files to staging area:", err)
+		return
+	}
+	fmt.Println("Staged all files in dotFyles directory")
+	// git commit
+	usersGitName := ""  //make sure to prompt user for this info
+	usersGitEmail := "" //make sure to prompt user for this info
+	commitMessage := "Initial commit"
+	commit, err := worktree.Commit(commitMessage, &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  usersGitName,  // You can customize this
+			Email: usersGitEmail, // Customize this too
+			When:  time.Now(),
+		},
+	})
+	if err != nil {
+		fmt.Println("Error commiting files:", err)
+		return
+	}
+
 }
