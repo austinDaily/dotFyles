@@ -20,6 +20,10 @@ var initCmd = &cobra.Command{
 	Run: createDotfyles,
 }
 
+func init() {
+	rootCmd.AddCommand(initCmd)
+}
+
 func createDotfyles(cmd *cobra.Command, args []string) {
 	// get users home dir
 	homeDir, err := os.UserHomeDir()
@@ -197,13 +201,13 @@ func addAndCommit(repoDir string) {
 	}
 	fmt.Println("Staged all files in dotFyles directory")
 	// git commit
-	usersGitName := ""  //make sure to prompt user for this info
-	usersGitEmail := "" //make sure to prompt user for this info
+	//usersGitName := ""  //make sure to prompt user for this info
+	//usersGitEmail := "" //make sure to prompt user for this info
 	commitMessage := "Initial commit"
 	commit, err := worktree.Commit(commitMessage, &git.CommitOptions{
 		Author: &object.Signature{
-			Name:  usersGitName,  // You can customize this
-			Email: usersGitEmail, // Customize this too
+			Name:  "austinDaily",             // You can customize this
+			Email: "snowtheparrot@proton.me", // Customize this too
 			When:  time.Now(),
 		},
 	})
@@ -211,5 +215,12 @@ func addAndCommit(repoDir string) {
 		fmt.Println("Error commiting files:", err)
 		return
 	}
+	// print the commit hash
+	obj, err := repo.CommitObject(commit)
+	if err != nil {
+		fmt.Println("Error retrieving commit object:", err)
+		return
+	}
+	fmt.Println("Committed files with commit hash:", obj.Hash)
 
 }
