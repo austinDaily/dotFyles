@@ -26,14 +26,18 @@ func createDotfyles(cmd *cobra.Command, args []string) {
 		return
 	}
 	// create the dotFyles dir path
-	newPath := filepath.Join(homeDir, "dotFyles")
+	dotFylesDir := filepath.Join(homeDir, "dotFyles")
 	//create the dotFyles directory
-	err = os.MkdirAll(newPath, 0755) // 0755 gives rwx permissions
+	err = os.MkdirAll(dotFylesDir, 0755) // 0755 gives rwx permissions
 	if err != nil {
 		fmt.Println("Error creating dotFyles directory:", err)
 		return
 	}
-	fmt.Println("dotFyles directory successfully created at:", newPath)
+	fmt.Println("dotFyles directory successfully created at:", dotFylesDir)
+	// initialize git repo
+	initializeRepo(dotFylesDir)
+	// find and copy/symlink the config files
+	findConfigs(dotFylesDir)
 }
 
 func initializeRepo(newPath string) {
@@ -84,14 +88,12 @@ var configs = []Config{
 	{Path: ".config/gtk-3.0/", IsDirectory: true},
 }
 
-func findConfigs() {
+func findConfigs(dotFylesDir string) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Println("Error retrieving Home directory:", err)
 		return
 	}
-
-	dotFylesDir := filepath.Join(homeDir, "dotFyles")
 
 	for _, config := range configs {
 		fullPath := filepath.Join(homeDir, config.Path)
