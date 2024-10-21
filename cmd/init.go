@@ -110,21 +110,26 @@ func findConfigs(dotFylesDir string) {
 		//check if file or directory exists
 		info, err := os.Stat(fullPath)
 		if err != nil {
-			if info.IsDir() {
-				// its a directory, create a symlink
-				err = symLinkDirectory(fullPath, destPath)
-				if err != nil {
-					fmt.Println("Error symlinking directory:", err)
-				}
+			if os.IsNotExist(err) {
+				fmt.Println("Not found:", fullPath)
+				continue
 			} else {
-				// its a file, copy it
-				err = copyFile(fullPath, destPath)
-				if err != nil {
-					fmt.Println("Error copying file:", err)
-				}
+				fmt.Println("Error checking path:", fullPath)
+				continue
+			}
+		}
+		if info.IsDir() {
+			// its a directory, create a symlink
+			err = symLinkDirectory(fullPath, destPath)
+			if err != nil {
+				fmt.Println("Error symlinking directory:", err)
 			}
 		} else {
-			fmt.Println("Not found:", fullPath)
+			// its a file, copy it
+			err = copyFile(fullPath, destPath)
+			if err != nil {
+				fmt.Println("Error copying file:", err)
+			}
 		}
 	}
 }
