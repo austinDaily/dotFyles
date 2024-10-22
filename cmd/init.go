@@ -1,21 +1,26 @@
 package cmd
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	transport "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/spf13/cobra"
 )
 
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "initializes program",
-	Long:  "creates new dir called dotFyles, collects your important dotfiles and copies them into dotFyles dir with symlinks, initilizes git repo, and pushes repo to your Github account.",
+	Long:  "creates new dir called dotfyles, collects your important dotfiles and copies them into dotfyles dir with symlinks, initilizes git repo, and pushes repo to your Github account.",
 
 	Run: createDotfyles,
 }
@@ -25,27 +30,150 @@ func init() {
 }
 
 func createDotfyles(cmd *cobra.Command, args []string) {
+	// Authenticate with GitHub
+	accessToken, err := authenticateWithGitHub()
+	if err != nil {
+		fmt.Println("Error during GitHub authentication:", err)
+		return
+	}
+	// accessToken for further GitHub API calls if needed
+	fmt.Println("GitHub authentication successful. Access token:", accessToken)
 	// get users home dir
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Println("Error retrieving Home directory:", err)
 		return
 	}
-	// create the dotFyles dir path
-	dotFylesDir := filepath.Join(homeDir, "dotFyles")
-	//create the dotFyles directory
-	err = os.MkdirAll(dotFylesDir, 0755) // 0755 gives rwx permissions
+	// create the dotfyles dir path
+	dotfylesDir := filepath.Join(homeDir, "dotfyles")
+	//create the dotfyles directory
+	err = os.MkdirAll(dotfylesDir, 0755) // 0755 gives rwx permissions
 	if err != nil {
-		fmt.Println("Error creating dotFyles directory:", err)
+		fmt.Println("Error creating dotfyles directory:", err)
 		return
 	}
-	fmt.Println("dotFyles directory successfully created at:", dotFylesDir)
+	fmt.Println("dotfyles directory successfully created at:", dotfylesDir)
 	// initialize git repo
-	initializeRepo(dotFylesDir)
+	initializeRepo(dotfylesDir)
 	// find and copy/symlink the config files
-	findConfigs(dotFylesDir)
+	findConfigs(dotfylesDir)
 	// stage and commit newly added config files
-	addAndCommit(dotFylesDir)
+	addAndCommit(dotfylesDir)
+	// push the repo to github
+	err = pushToGitHub(dotfylesDir, accessToken)
+	if err != nil {
+		fmt.Println("Error pushing to GitHub:", err)
+	}
+}
+
+func authenticateWithGitHub() (string, error) {
+	// request device and user verification codes
+	deviceAuthURL := "https://github.com/login/device/code"
+	clientID := "Ov23liNHy37PEdYFK4Jf"
+
+	deviceAuthRequest := map[string]interface{}{
+		"client_id": clientID,
+		"scope":     "repo", // adjust scopes as needed
+	}
+
+	reqBody, _ := json.Marshal(deviceAuthRequest)
+	resp, err := http.Post(deviceAuthURL, "application/json", bytes.NewBuffer(reqBody))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to request device code: %s", resp.Status)
+	}
+
+	var deviceAuthResponse struct {
+		DeviceCode      string `json:"device_code"`
+		UserCode        string `json:"user_code"`
+		VerificationURI string `json:"verification_uri"`
+		ExpiresIn       int    `json:"expires_in"`
+		Interval        int    `json:"interval"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&deviceAuthResponse); err != nil {
+		return "", err
+	}
+
+	// prompt user to enter user code
+	fmt.Printf("Please go to %s and enter the code: %s\n", deviceAuthResponse.VerificationURI, deviceAuthResponse.UserCode)
+
+	// poll for authorization status
+	var tokenResponse struct {
+		AccessToken string `json:"access_token"`
+	}
+
+	for {
+		time.Sleep(time.Duration(deviceAuthResponse.Interval) * time.Second)
+
+		tokenReq, err := http.NewRequest("POST", "https://github.com/login/oauth/access_token", nil)
+		if err != nil {
+			return "", err
+		}
+
+		q := tokenReq.URL.Query()
+		q.Add("client_id", clientID)
+		q.Add("device_code", deviceAuthResponse.DeviceCode)
+		q.Add("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
+		tokenReq.URL.RawQuery = q.Encode()
+		tokenReq.Header.Set("Accept", "application/json")
+
+		// set auth header for using client ID and no secret
+		tokenReq.SetBasicAuth(clientID, "")
+
+		resp, err := http.DefaultClient.Do(tokenReq)
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusOK {
+			if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
+				return "", err
+			}
+			return tokenResponse.AccessToken, nil
+		} else if resp.StatusCode == http.StatusForbidden {
+			fmt.Println("Authorization pending... Please check your browser.")
+		} else {
+			return "", fmt.Errorf("failed to obtain access token: %s", resp.Status)
+		}
+	}
+}
+
+func pushToGitHub(repoDir string, accessToken string) error {
+	repo, err := git.PlainOpen(repoDir)
+	if err != nil {
+		return fmt.Errorf("error opening git repo: %w", err)
+	}
+
+	// create a new remote pointing to the GitHub repo
+	remoteURL := "https://github.com/YOUR_GITHUB_USERNAME/dotfyles.git" // update this to direct to users github
+	_, err = repo.CreateRemote(&config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{remoteURL},
+	})
+	if err != nil {
+		return fmt.Errorf("error creating remote: %w", err)
+	}
+
+	// push to GitHub using the acess token for auth
+	err = repo.Push(&git.PushOptions{
+		RemoteName: "origin",
+		Auth: &transport.BasicAuth{
+			Username: "oauth2", // this is required
+			Password: accessToken,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("error pushing to GitHub: %w", err)
+	}
+
+	fmt.Println("Successfully pushed to GitHub repository!")
+	return nil
 }
 
 func initializeRepo(newPath string) {
@@ -96,7 +224,7 @@ var configs = []Config{
 	{Path: ".config/gtk-3.0/", IsDirectory: true},
 }
 
-func findConfigs(dotFylesDir string) {
+func findConfigs(dotfylesDir string) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Println("Error retrieving Home directory:", err)
@@ -105,7 +233,7 @@ func findConfigs(dotFylesDir string) {
 
 	for _, config := range configs {
 		fullPath := filepath.Join(homeDir, config.Path)
-		destPath := filepath.Join(dotFylesDir, filepath.Base(config.Path))
+		destPath := filepath.Join(dotfylesDir, filepath.Base(config.Path))
 
 		//check if file or directory exists
 		info, err := os.Stat(fullPath)
@@ -142,7 +270,7 @@ func copyFile(src, dst string) error {
 	}
 	defer sourceFile.Close()
 
-	// create the destination (copy) file in dotFyles
+	// create the destination (copy) file in dotfyles
 	destFile, err := os.Create(dst)
 	if err != nil {
 		return fmt.Errorf("error creating destination file: %w", err)
@@ -186,7 +314,7 @@ func symLinkDirectory(src, dst string) error {
 }
 
 func addAndCommit(repoDir string) {
-	// open the git repo in the dotFyles directory
+	// open the git repo in the dotfyles directory
 	repo, err := git.PlainOpen(repoDir)
 	if err != nil {
 		fmt.Println("Error opening git repo:", err)
@@ -204,7 +332,7 @@ func addAndCommit(repoDir string) {
 		fmt.Println("Error adding files to staging area:", err)
 		return
 	}
-	fmt.Println("Staged all files in dotFyles directory")
+	fmt.Println("Staged all files in dotfyles directory")
 	// git commit
 	//usersGitName := ""  //make sure to prompt user for this info
 	//usersGitEmail := "" //make sure to prompt user for this info
@@ -217,7 +345,7 @@ func addAndCommit(repoDir string) {
 		},
 	})
 	if err != nil {
-		fmt.Println("Error commiting files:", err)
+		fmt.Println("Error committing files:", err)
 		return
 	}
 	// print the commit hash

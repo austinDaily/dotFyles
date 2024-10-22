@@ -1,4 +1,4 @@
-module dotFyles
+module dotfyles
 
 go 1.23.2
 

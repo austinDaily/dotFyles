@@ -1,10 +1,9 @@
 /*
 Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-
 */
 package main
 
-import "dotFyles/cmd"
+import "dotfyles/cmd"
 
 func main() {
 	cmd.Execute()
