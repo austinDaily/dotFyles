@@ -84,7 +84,8 @@ func authenticateWithGitHub() (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to request device code: %s", resp.Status)
+		body, _ := io.ReadAll(resp.Body) // read the response body for debugging
+		return "", fmt.Errorf("failed to request device code: %s - %s", resp.Status, string(body))
 	}
 
 	var deviceAuthResponse struct {
@@ -96,7 +97,7 @@ func authenticateWithGitHub() (string, error) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&deviceAuthResponse); err != nil {
-		return "", err
+		return "", fmt.Errorf("error decoding device auth response: %w", err)
 	}
 
 	// prompt user to enter user code
@@ -131,15 +132,17 @@ func authenticateWithGitHub() (string, error) {
 		}
 		defer resp.Body.Close()
 
+		// read the body to debug
+		body, _ := io.ReadAll(resp.Body) // Read the response body for debugging
 		if resp.StatusCode == http.StatusOK {
-			if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
-				return "", err
+			if err := json.Unmarshal(body, &tokenResponse); err != nil {
+				return "", fmt.Errorf("error decoding token response: %w, response: %s", err, string(body))
 			}
 			return tokenResponse.AccessToken, nil
 		} else if resp.StatusCode == http.StatusForbidden {
 			fmt.Println("Authorization pending... Please check your browser.")
 		} else {
-			return "", fmt.Errorf("failed to obtain access token: %s", resp.Status)
+			return "", fmt.Errorf("failed to obtain access token: %s, response: %s", resp.Status, string(body))
 		}
 	}
 }
@@ -151,7 +154,7 @@ func pushToGitHub(repoDir string, accessToken string) error {
 	}
 
 	// create a new remote pointing to the GitHub repo
-	remoteURL := "https://github.com/YOUR_GITHUB_USERNAME/dotfyles.git" // update this to direct to users github
+	remoteURL := "https://github.com/austinDaily/dotfyles.git" // update this to direct to users github
 	_, err = repo.CreateRemote(&config.RemoteConfig{
 		Name: "origin",
 		URLs: []string{remoteURL},
