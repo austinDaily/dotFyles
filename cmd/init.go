@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -67,82 +69,96 @@ func createDotfyles(cmd *cobra.Command, args []string) {
 }
 
 func authenticateWithGitHub() (string, error) {
-	// request device and user verification codes
+	// Request device and user verification codes
 	deviceAuthURL := "https://github.com/login/device/code"
 	clientID := "Ov23liNHy37PEdYFK4Jf"
 
-	deviceAuthRequest := map[string]interface{}{
+	deviceAuthRequest := map[string]string{
 		"client_id": clientID,
-		"scope":     "repo", // adjust scopes as needed
+		"scope":     "repo",
 	}
 
 	reqBody, _ := json.Marshal(deviceAuthRequest)
 	resp, err := http.Post(deviceAuthURL, "application/json", bytes.NewBuffer(reqBody))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error making POST request: %w", err)
 	}
 	defer resp.Body.Close()
 
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading response body: %w", err)
+	}
+
+	// Log the raw body (for debugging)
+	fmt.Printf("Raw response body: %s\n", string(body))
+
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body) // read the response body for debugging
 		return "", fmt.Errorf("failed to request device code: %s - %s", resp.Status, string(body))
 	}
 
-	var deviceAuthResponse struct {
-		DeviceCode      string `json:"device_code"`
-		UserCode        string `json:"user_code"`
-		VerificationURI string `json:"verification_uri"`
-		ExpiresIn       int    `json:"expires_in"`
-		Interval        int    `json:"interval"`
+	// Parse the URL-encoded response
+	values, err := url.ParseQuery(string(body))
+	if err != nil {
+		return "", fmt.Errorf("error parsing response body: %w", err)
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&deviceAuthResponse); err != nil {
-		return "", fmt.Errorf("error decoding device auth response: %w", err)
+	// Extract the necessary fields
+	deviceCode := values.Get("device_code")
+	userCode := values.Get("user_code")
+	verificationURI := values.Get("verification_uri")
+	interval, err := strconv.Atoi(values.Get("interval"))
+	if err != nil {
+		return "", fmt.Errorf("error parsing interval: %w", err)
 	}
 
-	// prompt user to enter user code
-	fmt.Printf("Please go to %s and enter the code: %s\n", deviceAuthResponse.VerificationURI, deviceAuthResponse.UserCode)
+	fmt.Printf("Please go to %s and enter the code: %s\n", verificationURI, userCode)
+	fmt.Println("Press 'Enter' after you have entered the verification code.")
+	fmt.Scan() // Wait for user to press 'enter'
 
-	// poll for authorization status
-	var tokenResponse struct {
-		AccessToken string `json:"access_token"`
-	}
-
+	// Poll for authorization status
+	tokenURL := "https://github.com/login/oauth/access_token"
 	for {
-		time.Sleep(time.Duration(deviceAuthResponse.Interval) * time.Second)
+		time.Sleep(time.Duration(interval) * time.Second)
 
-		tokenReq, err := http.NewRequest("POST", "https://github.com/login/oauth/access_token", nil)
+		tokenRequestBody := url.Values{}
+		tokenRequestBody.Set("client_id", clientID)
+		tokenRequestBody.Set("device_code", deviceCode)
+		tokenRequestBody.Set("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
+
+		req, err := http.NewRequest("POST", tokenURL, bytes.NewBufferString(tokenRequestBody.Encode()))
 		if err != nil {
 			return "", err
 		}
 
-		q := tokenReq.URL.Query()
-		q.Add("client_id", clientID)
-		q.Add("device_code", deviceAuthResponse.DeviceCode)
-		q.Add("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
-		tokenReq.URL.RawQuery = q.Encode()
-		tokenReq.Header.Set("Accept", "application/json")
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Accept", "application/json")
 
-		// set auth header for using client ID and no secret
-		tokenReq.SetBasicAuth(clientID, "")
-
-		resp, err := http.DefaultClient.Do(tokenReq)
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return "", err
 		}
 		defer resp.Body.Close()
 
-		// read the body to debug
-		body, _ := io.ReadAll(resp.Body) // Read the response body for debugging
 		if resp.StatusCode == http.StatusOK {
-			if err := json.Unmarshal(body, &tokenResponse); err != nil {
-				return "", fmt.Errorf("error decoding token response: %w, response: %s", err, string(body))
+			var tokenResponse struct {
+				AccessToken string `json:"access_token"`
 			}
+			err = json.NewDecoder(resp.Body).Decode(&tokenResponse)
+			if err != nil {
+				return "", fmt.Errorf("error decoding token response: %w", err)
+			}
+
+			// Successfully received access token
 			return tokenResponse.AccessToken, nil
 		} else if resp.StatusCode == http.StatusForbidden {
 			fmt.Println("Authorization pending... Please check your browser.")
+		} else if resp.StatusCode == 428 { // "authorization_pending" status code
+			fmt.Println("Authorization pending... Waiting for user to authorize the device.")
 		} else {
-			return "", fmt.Errorf("failed to obtain access token: %s, response: %s", resp.Status, string(body))
+			body, _ := io.ReadAll(resp.Body)
+			return "", fmt.Errorf("failed to obtain access token: %s - %s", resp.Status, string(body))
 		}
 	}
 }
