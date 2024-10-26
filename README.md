@@ -19,4 +19,5 @@ Dotfyles is a command-line tool that scans your Home directory for your importan
 ### Usage
 ```bash
 dotfyles init
-
+```
+This command will create a git repo in your Home directory called "dotfyles", scan your Home directory for important configuration files/dirs, copy/symlink them to the "dotfyles" repo, stage and commit them to Git, and finally push them to your GitHub. When you run this command, you will be given an authorization code to enter into GitHub. Once you enter the correct auth code, your "dotfyles" repo will be push to your GitHub.
