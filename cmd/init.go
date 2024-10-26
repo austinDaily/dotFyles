@@ -85,26 +85,16 @@ func authenticateWithGitHub() (string, error) {
 	}
 	defer resp.Body.Close()
 
-	// Read the response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("error reading response body: %w", err)
 	}
 
-	// Log the raw body (for debugging)
-	fmt.Printf("Raw response body: %s\n", string(body))
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to request device code: %s - %s", resp.Status, string(body))
-	}
-
-	// Parse the URL-encoded response
 	values, err := url.ParseQuery(string(body))
 	if err != nil {
 		return "", fmt.Errorf("error parsing response body: %w", err)
 	}
 
-	// Extract the necessary fields
 	deviceCode := values.Get("device_code")
 	userCode := values.Get("user_code")
 	verificationURI := values.Get("verification_uri")
@@ -115,11 +105,15 @@ func authenticateWithGitHub() (string, error) {
 
 	fmt.Printf("Please go to %s and enter the code: %s\n", verificationURI, userCode)
 	fmt.Println("Press 'Enter' after you have entered the verification code.")
-	fmt.Scan() // Wait for user to press 'enter'
+	fmt.Scan() // Wait for user input before polling
 
-	// Poll for authorization status
 	tokenURL := "https://github.com/login/oauth/access_token"
+
+	// Poll for access token until user authorizes or an error occurs
 	for {
+		fmt.Println("Polling GitHub for access token...")
+
+		// Wait the specified interval before making the request
 		time.Sleep(time.Duration(interval) * time.Second)
 
 		tokenRequestBody := url.Values{}
@@ -141,23 +135,41 @@ func authenticateWithGitHub() (string, error) {
 		}
 		defer resp.Body.Close()
 
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", fmt.Errorf("error reading response body: %w", err)
+		}
+
+		// Print debugging information
+		fmt.Printf("Response Status: %s\n", resp.Status)
+		fmt.Printf("Response Headers: %v\n", resp.Header)
+		fmt.Printf("Raw response body from GitHub: %s\n", string(body))
+
 		if resp.StatusCode == http.StatusOK {
 			var tokenResponse struct {
 				AccessToken string `json:"access_token"`
 			}
-			err = json.NewDecoder(resp.Body).Decode(&tokenResponse)
+
+			err = json.Unmarshal(body, &tokenResponse)
 			if err != nil {
 				return "", fmt.Errorf("error decoding token response: %w", err)
 			}
 
-			// Successfully received access token
+			if tokenResponse.AccessToken == "" {
+				fmt.Println("Received empty access token. Continuing to poll.")
+				continue
+			}
+
+			fmt.Println("GitHub authentication successful.")
 			return tokenResponse.AccessToken, nil
+
+		} else if resp.StatusCode == 428 { // "authorization_pending"
+			fmt.Println("Authorization still pending... retrying in", interval, "seconds.")
+
 		} else if resp.StatusCode == http.StatusForbidden {
-			fmt.Println("Authorization pending... Please check your browser.")
-		} else if resp.StatusCode == 428 { // "authorization_pending" status code
-			fmt.Println("Authorization pending... Waiting for user to authorize the device.")
+			return "", fmt.Errorf("authorization failed; user may have denied the request")
+
 		} else {
-			body, _ := io.ReadAll(resp.Body)
 			return "", fmt.Errorf("failed to obtain access token: %s - %s", resp.Status, string(body))
 		}
 	}
