@@ -181,23 +181,62 @@ func pushToGitHub(repoDir string, accessToken string) error {
 		return fmt.Errorf("error opening git repo: %w", err)
 	}
 
-	// create a new remote pointing to the GitHub repo
-	remoteURL := "https://github.com/austinDaily/dotfyles.git" // update this to direct to users github
-	_, err = repo.CreateRemote(&config.RemoteConfig{
-		Name: "origin",
-		URLs: []string{remoteURL},
-	})
-	if err != nil {
-		return fmt.Errorf("error creating remote: %w", err)
+	remoteURL := "https://github.com/austinDaily/dotfyles.git" // Update to direct to the user's actual GitHub repo
+
+	// Check if the remote "origin" exists; create it if it doesn’t
+	_, err = repo.Remote("origin")
+	if err == git.ErrRemoteNotFound {
+		_, err = repo.CreateRemote(&config.RemoteConfig{
+			Name: "origin",
+			URLs: []string{remoteURL},
+		})
+		if err != nil {
+			return fmt.Errorf("error creating remote: %w", err)
+		}
+		fmt.Println("Remote 'origin' created successfully.")
+	} else if err != nil {
+		return fmt.Errorf("error checking remote: %w", err)
+	} else {
+		fmt.Println("Remote 'origin' already exists. Reusing existing remote.")
 	}
 
-	// push to GitHub using the acess token for auth
+	// Fetch the latest changes from the remote repository
+	err = repo.Fetch(&git.FetchOptions{
+		RemoteName: "origin",
+		Auth: &transport.BasicAuth{
+			Username: "oauth2",
+			Password: accessToken,
+		},
+	})
+	if err != nil && err != git.NoErrAlreadyUpToDate {
+		return fmt.Errorf("error fetching from GitHub: %w", err)
+	}
+
+	// Get the worktree for checking and staging changes
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("error retrieving worktree: %w", err)
+	}
+
+	// Check for local changes to avoid unnecessary push attempts
+	status, err := worktree.Status()
+	if err != nil {
+		return fmt.Errorf("error checking worktree status: %w", err)
+	}
+
+	if status.IsClean() {
+		fmt.Println("No changes to push; repository is up-to-date.")
+		return nil
+	}
+
+	// Push with force to ensure sync
 	err = repo.Push(&git.PushOptions{
 		RemoteName: "origin",
 		Auth: &transport.BasicAuth{
-			Username: "oauth2", // this is required
+			Username: "oauth2",
 			Password: accessToken,
 		},
+		Force: true, // Force push to handle non-fast-forward updates
 	})
 	if err != nil {
 		return fmt.Errorf("error pushing to GitHub: %w", err)
