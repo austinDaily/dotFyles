@@ -1,4 +1,4 @@
-# Dotfyles - A CLI Dotfile Manager
+# Dotfyles - A CLI Dotfile Manager (still under development, init command works, refresh command does not)
 
 Dotfyles is a command-line tool that scans your Home directory for your important dotfiles, creates a dedicated directory for them, and pushes this repository to your GitHub account, **all with one command**. This makes it easy to back up, restore, and share your configuration files across different systems.
 
