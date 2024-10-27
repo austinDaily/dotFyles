@@ -47,7 +47,7 @@ func createDotfyles(cmd *cobra.Command, args []string) {
 		return
 	}
 	// create the dotfyles dir path
-	dotfylesDir := filepath.Join(homeDir, "dotfyles")
+	dotfylesDir := filepath.Join(homeDir, "myDotfyles")
 	//create the dotfyles directory
 	err = os.MkdirAll(dotfylesDir, 0755) // 0755 gives rwx permissions
 	if err != nil {
@@ -181,7 +181,7 @@ func pushToGitHub(repoDir string, accessToken string) error {
 		return fmt.Errorf("error opening git repo: %w", err)
 	}
 
-	remoteURL := "https://github.com/austinDaily/dotfyles.git" // Update to direct to the user's actual GitHub repo
+	remoteURL := "https://github.com/austinDaily/myDotfyles.git" // Update to direct to the user's actual GitHub repo
 
 	// Check if the remote "origin" exists; create it if it doesn’t
 	_, err = repo.Remote("origin")
