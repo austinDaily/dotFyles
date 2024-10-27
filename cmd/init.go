@@ -22,7 +22,7 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "initializes program",
-	Long:  "creates new dir called dotfyles, collects your important dotfiles and copies them into dotfyles dir with symlinks, initilizes git repo, and pushes repo to your Github account.",
+	Long:  "creates new dir called myDotfyles, collects your important dotfiles and copies them into myDotfyles dir with symlinks, initilizes git repo, and pushes repo to your Github account.",
 
 	Run: createDotfyles,
 }
@@ -54,7 +54,7 @@ func createDotfyles(cmd *cobra.Command, args []string) {
 		fmt.Println("Error creating dotfyles directory:", err)
 		return
 	}
-	fmt.Println("dotfyles directory successfully created at:", dotfylesDir)
+	fmt.Println("myDotfyles directory successfully created at:", dotfylesDir)
 	// initialize git repo
 	initializeRepo(dotfylesDir)
 	// find and copy/symlink the config files
@@ -104,7 +104,6 @@ func authenticateWithGitHub() (string, error) {
 	}
 
 	fmt.Printf("Please go to %s and enter the code: %s\n", verificationURI, userCode)
-	fmt.Println("Press 'Enter' after you have entered the verification code.")
 	fmt.Scan() // Wait for user input before polling
 
 	tokenURL := "https://github.com/login/oauth/access_token"
@@ -141,9 +140,9 @@ func authenticateWithGitHub() (string, error) {
 		}
 
 		// Print debugging information
-		fmt.Printf("Response Status: %s\n", resp.Status)
-		fmt.Printf("Response Headers: %v\n", resp.Header)
-		fmt.Printf("Raw response body from GitHub: %s\n", string(body))
+		//fmt.Printf("Response Status: %s\n", resp.Status)
+		//fmt.Printf("Response Headers: %v\n", resp.Header)
+		//fmt.Printf("Raw response body from GitHub: %s\n", string(body))
 
 		if resp.StatusCode == http.StatusOK {
 			var tokenResponse struct {
@@ -156,7 +155,7 @@ func authenticateWithGitHub() (string, error) {
 			}
 
 			if tokenResponse.AccessToken == "" {
-				fmt.Println("Received empty access token. Continuing to poll.")
+				fmt.Println("No response yet...")
 				continue
 			}
 
@@ -402,7 +401,7 @@ func addAndCommit(repoDir string) {
 		fmt.Println("Error adding files to staging area:", err)
 		return
 	}
-	fmt.Println("Staged all files in dotfyles directory")
+	fmt.Println("Staged all files in myDotfyles directory")
 	// git commit
 	//usersGitName := ""  //make sure to prompt user for this info
 	//usersGitEmail := "" //make sure to prompt user for this info
