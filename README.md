@@ -13,7 +13,7 @@ Dotfyles is a command-line tool that scans your Home directory for your importan
 - [Go](https://golang.org/doc/install) (latest version recommended)
 - Git
 - A GitHub account.
-- Make sure your GitHub account does not already contain a repo called "dotFyles", as this program will overwrite it.
+- Make sure your GitHub account does not already contain a repo called "dotfyles", as this program will overwrite it.
 
 ### Usage
 ```bash

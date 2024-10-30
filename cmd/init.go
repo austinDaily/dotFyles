@@ -22,7 +22,7 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "initializes program",
-	Long:  "creates new dir called myDotfyles, collects your important dotfiles and copies them into myDotfyles dir with symlinks, initilizes git repo, and pushes repo to your Github account.",
+	Long:  "creates new dir called dotfyles, collects your important dotfiles and copies them into dotfyles dir with symlinks, initilizes git repo, and pushes repo to your Github account.",
 
 	Run: createDotfyles,
 }
@@ -47,14 +47,14 @@ func createDotfyles(cmd *cobra.Command, args []string) {
 		return
 	}
 	// create the dotfyles dir path
-	dotfylesDir := filepath.Join(homeDir, "myDotfyles")
+	dotfylesDir := filepath.Join(homeDir, "dotfyles")
 	//create the dotfyles directory
 	err = os.MkdirAll(dotfylesDir, 0755) // 0755 gives rwx permissions
 	if err != nil {
 		fmt.Println("Error creating dotfyles directory:", err)
 		return
 	}
-	fmt.Println("myDotfyles directory successfully created at:", dotfylesDir)
+	fmt.Println("dotfyles directory successfully created at:", dotfylesDir)
 	// initialize git repo
 	initializeRepo(dotfylesDir)
 	// find and copy/symlink the config files
@@ -180,7 +180,7 @@ func pushToGitHub(repoDir string, accessToken string) error {
 		return fmt.Errorf("error opening git repo: %w", err)
 	}
 
-	remoteURL := "https://github.com/austinDaily/myDotfyles.git" // Update to direct to the user's actual GitHub repo
+	remoteURL := "https://github.com/austinDaily/dotfyles.git" // Update to direct to the user's actual GitHub repo
 
 	// Check if the remote "origin" exists; create it if it doesn’t
 	_, err = repo.Remote("origin")
@@ -401,7 +401,7 @@ func addAndCommit(repoDir string) {
 		fmt.Println("Error adding files to staging area:", err)
 		return
 	}
-	fmt.Println("Staged all files in myDotfyles directory")
+	fmt.Println("Staged all files in dotfyles directory")
 	// git commit
 	//usersGitName := ""  //make sure to prompt user for this info
 	//usersGitEmail := "" //make sure to prompt user for this info
