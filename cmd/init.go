@@ -230,7 +230,7 @@ func pushToGitHub(repoDir string, accessToken string) error {
 		return nil
 	}
 
-	// Push with force to ensure sync
+	// Push to github
 	err = repo.Push(&git.PushOptions{
 		RemoteName: "origin",
 		Auth: &transport.BasicAuth{
