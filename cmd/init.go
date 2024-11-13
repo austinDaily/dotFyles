@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -235,7 +237,6 @@ func pushToGitHub(repoDir string, accessToken string) error {
 			Username: "oauth2",
 			Password: accessToken,
 		},
-		Force: true, // Force push to handle non-fast-forward updates
 	})
 	if err != nil {
 		return fmt.Errorf("error pushing to GitHub: %w", err)
@@ -382,6 +383,14 @@ func symLinkDirectory(src, dst string) error {
 	return nil
 }
 
+// Prompt for user input in the terminal
+func promptUserInput(promptText string) string {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print(promptText)
+	input, _ := reader.ReadString('\n')
+	return strings.TrimSpace(input)
+}
+
 func addAndCommit(repoDir string) {
 	// open the git repo in the dotfyles directory
 	repo, err := git.PlainOpen(repoDir)
@@ -402,14 +411,17 @@ func addAndCommit(repoDir string) {
 		return
 	}
 	fmt.Println("Staged all files in dotfyles directory")
+
+	// Prompt user for Git username and email
+	username := promptUserInput("Enter your Git username: ")
+	email := promptUserInput("Enter your Git email: ")
+
 	// git commit
-	//usersGitName := ""  //make sure to prompt user for this info
-	//usersGitEmail := "" //make sure to prompt user for this info
 	commitMessage := "Initial commit"
 	commit, err := worktree.Commit(commitMessage, &git.CommitOptions{
 		Author: &object.Signature{
-			Name:  "austinDaily",             // You can customize this
-			Email: "snowtheparrot@proton.me", // Customize this too
+			Name:  username,
+			Email: email,
 			When:  time.Now(),
 		},
 	})
@@ -417,6 +429,7 @@ func addAndCommit(repoDir string) {
 		fmt.Println("Error committing files:", err)
 		return
 	}
+
 	// print the commit hash
 	obj, err := repo.CommitObject(commit)
 	if err != nil {
@@ -424,5 +437,4 @@ func addAndCommit(repoDir string) {
 		return
 	}
 	fmt.Println("Committed files with commit hash:", obj.Hash)
-
 }
