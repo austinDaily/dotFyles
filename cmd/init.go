@@ -24,7 +24,7 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "initializes program",
-	Long:  "creates new dir called dotfyles, collects your important dotfiles and copies them into dotfyles dir with symlinks, initilizes git repo, and pushes repo to your Github account.",
+	Long:  "creates new dir called myDotfyles, collects your important dotfiles and copies them into myDotfyles dir with symlinks, initilizes git repo, and pushes repo to your Github account.",
 
 	Run: createDotfyles,
 }
@@ -48,15 +48,15 @@ func createDotfyles(cmd *cobra.Command, args []string) {
 		fmt.Println("Error retrieving Home directory:", err)
 		return
 	}
-	// create the dotfyles dir path
-	dotfylesDir := filepath.Join(homeDir, "dotfyles")
-	//create the dotfyles directory
+	// create the myDotfyles dir path
+	dotfylesDir := filepath.Join(homeDir, "myDotfyles")
+	//create the myDotfyles directory
 	err = os.MkdirAll(dotfylesDir, 0755) // 0755 gives rwx permissions
 	if err != nil {
-		fmt.Println("Error creating dotfyles directory:", err)
+		fmt.Println("Error creating myDotfyles directory:", err)
 		return
 	}
-	fmt.Println("dotfyles directory successfully created at:", dotfylesDir)
+	fmt.Println("myDotfyles directory successfully created at:", dotfylesDir)
 	// initialize git repo
 	initializeRepo(dotfylesDir)
 	// find and copy/symlink the config files
@@ -182,7 +182,7 @@ func pushToGitHub(repoDir string, accessToken string) error {
 		return fmt.Errorf("error opening git repo: %w", err)
 	}
 
-	remoteURL := "https://github.com/austinDaily/dotfyles.git" // Update to direct to the user's actual GitHub repo
+	remoteURL := "https://github.com/austinDaily/myDotfyles.git" // Update to direct to the user's actual GitHub repo
 
 	// Check if the remote "origin" exists; create it if it doesn’t
 	_, err = repo.Remote("origin")
@@ -340,7 +340,7 @@ func copyFile(src, dst string) error {
 	}
 	defer sourceFile.Close()
 
-	// create the destination (copy) file in dotfyles
+	// create the destination (copy) file in myDotfyles
 	destFile, err := os.Create(dst)
 	if err != nil {
 		return fmt.Errorf("error creating destination file: %w", err)
@@ -392,7 +392,7 @@ func promptUserInput(promptText string) string {
 }
 
 func addAndCommit(repoDir string) {
-	// open the git repo in the dotfyles directory
+	// open the git repo in the myDotfyles directory
 	repo, err := git.PlainOpen(repoDir)
 	if err != nil {
 		fmt.Println("Error opening git repo:", err)
@@ -410,7 +410,7 @@ func addAndCommit(repoDir string) {
 		fmt.Println("Error adding files to staging area:", err)
 		return
 	}
-	fmt.Println("Staged all files in dotfyles directory")
+	fmt.Println("Staged all files in myDotfyles directory")
 
 	// Prompt user for Git username and email
 	username := promptUserInput("Enter your Git username: ")
